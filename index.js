@@ -26,11 +26,9 @@ app.set("trust proxy", true);
 // Middleware
 // Helmet default CSP memblokir SEMUA inline <script>, termasuk script
 // di public/404.html yang butuh jalan buat nulis domain dinamis
-// (window.location.hostname) ke halaman. Makanya domain di 404 page
-// selalu ketampil statis "example.com" gak peduli diakses dari mana -
-// script-nya sebenarnya gak pernah dieksekusi browser karena kena block
-// CSP. Di sini script-src dikasih 'unsafe-inline' supaya script itu
-// jalan, sementara proteksi helmet lain (X-Frame-Options, dst) tetap aktif.
+// (window.location.hostname) ke halaman. Di sini script-src dikasih
+// 'unsafe-inline' supaya script itu jalan, sementara proteksi helmet
+// lain (X-Frame-Options, dst) tetap aktif.
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -134,16 +132,24 @@ app.use("/api/uploader", require("./routes/uploader"));
 
 // ========== WHITELIST + DNS ERROR PAGE ==========
 const WHITELIST = [
-    '/', '/api/', '/js/', '/css/', '/fonts/',
+    '/api/', '/js/', '/css/', '/fonts/',
     '/ai', '/ai-image', '/maker', '/downloader', '/game',
     '/informasi', '/random', '/search', '/stalker', '/tools',
     '/uploader', '/maker/brat', '/maker/fakengl', '/dashboard.html'
 ];
+// Path yang harus exact match, JANGAN pakai startsWith - karena
+// '/'.startsWith bakal cocok ke SEMUA path apapun (mis. '/anjay/apapun'
+// startsWith '/' = true), jadi request yang seharusnya 404 malah lolos
+// whitelist dan diteruskan ke Express default handler yang balikin
+// "Cannot GET ..." bawaan Express, bukan halaman 404.html custom kita.
+const EXACT_WHITELIST = ['/'];
 
 app.use((req, res, next) => {
     const reqPath = req.path.toLowerCase();
-    const isWhitelisted = WHITELIST.some(p => reqPath.startsWith(p) || reqPath === p);
-    
+    const isWhitelisted =
+        EXACT_WHITELIST.includes(reqPath) ||
+        WHITELIST.some(p => reqPath === p || reqPath.startsWith(p));
+
     if (isWhitelisted) return next();
     
     const ua = req.headers['user-agent'] || '';
