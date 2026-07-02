@@ -24,7 +24,21 @@ const PORT = process.env.PORT || 3000;
 app.set("trust proxy", true);
 
 // Middleware
-app.use(helmet());
+// Helmet default CSP memblokir SEMUA inline <script>, termasuk script
+// di public/404.html yang butuh jalan buat nulis domain dinamis
+// (window.location.hostname) ke halaman. Makanya domain di 404 page
+// selalu ketampil statis "example.com" gak peduli diakses dari mana -
+// script-nya sebenarnya gak pernah dieksekusi browser karena kena block
+// CSP. Di sini script-src dikasih 'unsafe-inline' supaya script itu
+// jalan, sementara proteksi helmet lain (X-Frame-Options, dst) tetap aktif.
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            "script-src": ["'self'", "'unsafe-inline'"],
+        },
+    },
+}));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
